@@ -112,7 +112,7 @@ echo "   Confidence: $SYNTHESIS_CONFIDENCE"
 echo ""
 echo "📝 Generating report..."
 
-# Create markdown report
+# Create markdown report — ONLY the direct RAG answer
 cat > "${REPORT_FILE}.md" << EOF
 # 📋 Report: $(echo "$QUERY" | head -c 60)
 
@@ -121,42 +121,26 @@ cat > "${REPORT_FILE}.md" << EOF
 $QUERY
 \`\`\`
 
-## 📊 Content Type
-**Type:** \`${CONTENT_TYPE}\`  
-**Confidence:** ${SYNTHESIS_CONFIDENCE}
-
 ---
 
-## ⚡ Synthesized Content (v3.0 + qwen3:14b)
-
-$SYNTHESIZED_CONTENT
-
----
-
-## 📚 Source Data
-
-| Metric | Wert |
-|--------|------|
-| **Latenz** | ${LATENCY} ms |
-| **PDFs durchsucht** | ${SOURCE_COUNT} |
-| **PDFs analysiert** | ${PDF_COUNT} |
-| **Content Type** | ${CONTENT_TYPE} |
-| **Confidence** | ${SYNTHESIS_CONFIDENCE} |
-| **Generiert** | $(date '+%Y-%m-%d %H:%M UTC') |
-| **Tool** | RAG-Daemon v0.5 + qwen3:14b |
-| **Framework** | PDF-Search v3.0 (Universal) |
-
----
-
-## 📖 Initial RAG Summary (for reference)
+## 💡 Antwort
 
 $ANSWER
 
 ---
 
-_Dieser Report wurde automatisch mit PDF-Search v3.0 generiert._  
-_Extraktion + Synthese: lokale 14b-KI-Analyse._  
-_Keine externen Cloud-Dienste verwendet._
+## 📊 Metadaten
+
+| Metric | Wert |
+|--------|------|
+| **Latenz** | ${LATENCY} ms |
+| **PDFs durchsucht** | ${SOURCE_COUNT} |
+| **Generiert** | $(date '+%Y-%m-%d %H:%M UTC') |
+| **Tool** | RAG-Daemon v0.5 + qwen3:14b |
+
+---
+
+_Automatisch generiert mit PDF-Search v3.0._
 EOF
 
 echo "✅ Markdown created: ${REPORT_FILE}.md"

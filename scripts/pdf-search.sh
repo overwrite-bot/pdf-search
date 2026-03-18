@@ -135,27 +135,52 @@ EOF
 echo "✅ Markdown created: ${REPORT_FILE}.md"
 
 # ============================================================================
-# PHASE 5+6: Display Report in PDF Viewer
+# PHASE 5: Convert Markdown to PDF with LibreOffice
+# ============================================================================
+
+echo ""
+echo "📄 Converting to PDF..."
+
+# Method 1: LibreOffice snap (if available)
+if command -v /snap/bin/libreoffice &> /dev/null; then
+    /snap/bin/libreoffice --headless --convert-to pdf:writer_pdf_Export \
+      --outdir "$DOKUMENTE" "${REPORT_FILE}.md" 2>/dev/null
+    if [[ $? -eq 0 ]]; then
+        echo "✅ PDF created with LibreOffice Snap"
+        PDF_FILE="${DOKUMENTE}/$(basename ${REPORT_FILE}).pdf"
+    fi
+fi
+
+# Method 2: System LibreOffice (if snap failed)
+if [[ ! -f "$PDF_FILE" ]] && command -v libreoffice &> /dev/null; then
+    libreoffice --headless --convert-to pdf:writer_pdf_Export \
+      --outdir "$DOKUMENTE" "${REPORT_FILE}.md" 2>/dev/null
+    if [[ $? -eq 0 ]]; then
+        echo "✅ PDF created with LibreOffice"
+        PDF_FILE="${DOKUMENTE}/$(basename ${REPORT_FILE}).pdf"
+    fi
+fi
+
+# ============================================================================
+# PHASE 6: Display Report in PDF Viewer
 # ============================================================================
 
 echo ""
 echo "✅ REPORT COMPLETE:"
-ls -lh "${REPORT_FILE}".md 2>/dev/null
-
-echo ""
-echo "📂 Saved to: $DOKUMENTE"
-echo "   📝 Report: $(basename ${REPORT_FILE}.md)"
-
-# Open in evince (works with markdown too)
-if [[ -f "${REPORT_FILE}.md" ]]; then
-    # First try PDF, fallback to text editor
-    if command -v evince &> /dev/null; then
-        DISPLAY=:1 evince "${REPORT_FILE}.md" &
-        echo "   📖 Opening in viewer..."
-    else
-        xdg-open "${REPORT_FILE}.md" &
-        echo "   📖 Opening..."
-    fi
+if [[ -f "$PDF_FILE" ]]; then
+    ls -lh "$PDF_FILE"
+    echo "📂 Saved: $(basename ${REPORT_FILE}).pdf"
+    echo ""
+    # Open PDF in evince
+    DISPLAY=:1 evince "$PDF_FILE" &
+    echo "📖 Opening in PDF viewer..."
+else
+    ls -lh "${REPORT_FILE}".md
+    echo "📂 Saved: $(basename ${REPORT_FILE}).md (Markdown fallback)"
+    echo ""
+    # Fallback: open markdown
+    DISPLAY=:1 xdg-open "${REPORT_FILE}.md" &
+    echo "📖 Opening..."
 fi
 
 # Cleanup temp files

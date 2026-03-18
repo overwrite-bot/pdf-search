@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """
-Extract recipes from PDFs using pdfplumber.
-Identifies recipe patterns (Zutaten, Zubereitung, ingredients, instructions)
+Universal PDF Content Extraction Framework
+Identifies and extracts: recipes, how-to guides, reference material, data, technical content
 """
 
 import sys
 import json
 import re
 from pathlib import Path
+from enum import Enum
 
 try:
     import pdfplumber
 except ImportError:
     print("ERROR: pdfplumber not installed. Install with: pip install pdfplumber", file=sys.stderr)
     sys.exit(1)
+
+
+class ContentType(Enum):
+    """Supported content types"""
+    RECIPE = "recipe"
+    HOWTO = "howto"
+    REFERENCE = "reference"
+    DATA = "data"
+    TECHNICAL = "technical"
+    UNKNOWN = "unknown"
 
 
 def extract_text_from_pdf(pdf_path, max_pages=20):
@@ -28,6 +39,42 @@ def extract_text_from_pdf(pdf_path, max_pages=20):
     except Exception as e:
         print(f"ERROR reading {pdf_path}: {e}", file=sys.stderr)
         return ""
+
+
+def detect_content_type(text, query=""):
+    """
+    Detect the type of content in the text.
+    Returns ContentType enum.
+    """
+    text_lower = text.lower()
+    query_lower = query.lower()
+    
+    # Recipe detection
+    recipe_keywords = ['zutaten', 'rezept', 'zubereitung', 'ingredient', 'recipe', 'gericht', 'garzeit', 'portionen', 'servings']
+    if sum(1 for kw in recipe_keywords if kw in text_lower) >= 2:
+        return ContentType.RECIPE
+    
+    # How-To detection
+    howto_keywords = ['schritt', 'anleitung', 'wie', 'instruction', 'step', 'vorbereitung', 'preparation', 'voraussetzung']
+    if sum(1 for kw in howto_keywords if kw in text_lower) >= 2:
+        return ContentType.HOWTO
+    
+    # Data detection
+    data_keywords = ['tabelle', 'table', 'liste', 'list', 'temperatur', 'daten', 'data', 'statistik', 'wert', 'value']
+    if sum(1 for kw in data_keywords if kw in text_lower) >= 2:
+        return ContentType.DATA
+    
+    # Technical detection
+    tech_keywords = ['config', 'befehl', 'command', 'code', 'kalibrierung', 'setup', 'installation', 'parameter']
+    if sum(1 for kw in tech_keywords if kw in text_lower) >= 2:
+        return ContentType.TECHNICAL
+    
+    # Reference detection
+    ref_keywords = ['definition', 'erklär', 'definition', 'explain', 'charakteristik', 'eigenschaft', 'property', 'merkmal']
+    if sum(1 for kw in ref_keywords if kw in text_lower) >= 1:
+        return ContentType.REFERENCE
+    
+    return ContentType.UNKNOWN
 
 
 def find_recipe_sections(text):
@@ -148,7 +195,7 @@ def extract_contextual_info(text, query):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: extract-recipes.py <pdf_path> [query]")
+        print("Usage: extract-content.py <pdf_path> [query]")
         sys.exit(1)
     
     pdf_path = sys.argv[1]
@@ -166,18 +213,32 @@ def main():
         print("ERROR: Could not extract text from PDF", file=sys.stderr)
         sys.exit(1)
     
-    # Find recipes
-    recipes = find_recipe_sections(text)
+    # Detect content type
+    content_type = detect_content_type(text, query)
+    print(f"   Content type detected: {content_type.value}", file=sys.stderr)
     
     # Find contextual info if query provided
     contexts = extract_contextual_info(text, query) if query else []
     
+    # Extract based on content type
+    extracted_data = {}
+    
+    if content_type == ContentType.RECIPE:
+        recipes = find_recipe_sections(text)
+        extracted_data['recipes'] = recipes
+        extracted_data['count'] = len(recipes)
+    else:
+        # For non-recipe types, use contextual extraction as foundation
+        extracted_data['sections'] = contexts
+        extracted_data['count'] = len(contexts)
+    
     # Output as JSON
     output = {
         'pdf': Path(pdf_path).name,
-        'recipes_found': len(recipes),
-        'recipes': recipes,
-        'contextual_snippets': contexts if contexts else []
+        'content_type': content_type.value,
+        'extracted_data': extracted_data,
+        'contextual_snippets': contexts if contexts else [],
+        'confidence': 0.8 if (extracted_data.get('count', 0) > 0) else 0.3
     }
     
     print(json.dumps(output, ensure_ascii=False, indent=2))

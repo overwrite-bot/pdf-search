@@ -32,7 +32,13 @@ TEMP_EXTRACT="${DOKUMENTE}/.extract-${TIMESTAMP}.json"
 TEMP_SYNTHESIS="${DOKUMENTE}/.synthesis-${TIMESTAMP}.json"
 
 echo "🔍 Query: '$QUERY'"
-echo "📊 Searching via RAG-Daemon (14b + PDF Index)..."
+echo "📊 Searching via RAG-Daemon..."
+echo "   Datensammlung:"
+echo "     ✓ memory.db (11.5k lokale Notizen)"
+echo "     ✓ kb.db (Knowledge Base)"
+echo "     ✓ pdf-index.db (8481 PDFs, FTS5)"
+echo "     ✓ Kiwix (49 GB Wikipedia)"
+echo ""
 
 # ============================================================================
 # PHASE 1: RAG-Daemon Query (find relevant PDFs)
@@ -129,14 +135,24 @@ $ANSWER
 
 ---
 
+## 📚 Datenquellen durchsucht
+
+- ✓ **memory.db** (11,500 lokale Notizen)
+- ✓ **kb.db** (Knowledge Base)
+- ✓ **pdf-index.db** (8,481 PDFs mit FTS5-Index)
+- ✓ **Kiwix Wikipedia** (49 GB, Deutsch)
+
+---
+
 ## 📊 Metadaten
 
 | Metric | Wert |
 |--------|------|
 | **Latenz** | ${LATENCY} ms |
-| **PDFs durchsucht** | ${SOURCE_COUNT} |
+| **PDFs gefunden** | ${SOURCE_COUNT} |
 | **Generiert** | $(date '+%Y-%m-%d %H:%M UTC') |
 | **Tool** | RAG-Daemon v0.5 + qwen3:14b |
+| **Framework** | PDF-Search v3.0 |
 
 ---
 

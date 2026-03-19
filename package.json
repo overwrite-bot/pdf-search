@@ -1,0 +1,71 @@
+{
+  "name": "pdf-zusammenfassung",
+  "version": "3.2.0",
+  "description": "Local PDF search + Wikipedia synthesis with 14b RAG summarization. Dual-source knowledge base for offline-first workflows.",
+  "type": "module",
+  "main": "scripts/pdf-search.sh",
+  "scripts": {
+    "start": "bash scripts/pdf-search.sh",
+    "test": "bash scripts/test.sh",
+    "help": "echo 'Usage: pdf-search \"query\" [category]' && echo 'Categories: all, tech, cooking, esoterik, philosophy, health'"
+  },
+  "keywords": [
+    "pdf",
+    "search",
+    "rag",
+    "wikipedia",
+    "kiwix",
+    "offline",
+    "summarization",
+    "dual-synthesis",
+    "local-ai",
+    "ollama",
+    "14b"
+  ],
+  "author": "overwrite-bot",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/overwrite-bot/pdf-search.git"
+  },
+  "homepage": "https://github.com/overwrite-bot/pdf-search",
+  "bugs": {
+    "url": "https://github.com/overwrite-bot/pdf-search/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "bash": ">=5.0"
+  },
+  "requirements": {
+    "system": [
+      "bash",
+      "curl",
+      "sqlite3",
+      "jq",
+      "python3"
+    ],
+    "services": [
+      "RAG-Daemon (http://127.0.0.1:5555)",
+      "Kiwix (http://localhost:8080)"
+    ],
+    "python": [
+      "beautifulsoup4",
+      "lxml",
+      "requests",
+      "reportlab"
+    ]
+  },
+  "config": {
+    "rag_daemon_url": "http://127.0.0.1:5555",
+    "kiwix_url": "http://localhost:8080",
+    "pdf_index_db": "/media/overwrite/Datenplatte 2/pdf-index.db",
+    "output_dir": "~/Dokumente"
+  },
+  "categories": [
+    "search",
+    "knowledge-base",
+    "rag",
+    "pdf-processing",
+    "offline-ai"
+  ]
+}

@@ -1,117 +1,127 @@
-# PDF Categorization Improvement Program
+# PROGRAM.md — pdf_zusammenfassung Optimization
 
 ## Goal
-Replace keyword-based PDF categorization with German BERT embeddings for better accuracy.
+Improve pdf_zusammenfassung skill quality and performance through autonomous iteration.
 
-**Target Accuracy:** >95% on test set of known PDFs
-**Current Baseline:** ~75% (keyword-matching, known issues with "Apokalypse" → "Apokalypse" tagged as tech)
+## Key Metrics to Optimize
 
-## Core File
-**Location:** `categorization-core.py`
+1. **Extraction Quality** (0-100)
+   - Does the extracted content match the actual PDF content?
+   - Are recipes detected correctly?
+   - Are essay summaries relevant?
+   - Measured via: test suite pass rate, manual spot checks
 
-**Modifiable sections:**
-1. `MODEL_NAME` — Which transformer model to use
-2. `CATEGORY_DEFINITIONS` — Category label descriptions
-3. `categorize_pdf()` — Similarity computation & threshold
-4. `categorize_all_pdfs()` — Batch processing logic
+2. **Link Validity** (0-100)
+   - Do source links work correctly?
+   - Are file:// URLs properly formed?
+   - Measured via: link_test.py (checks 5 random PDFs)
+
+3. **Processing Speed** (ms)
+   - How fast is the full pipeline?
+   - Extract → Synthesize → Format
+   - Target: <120s per query (currently ~110s average)
+
+4. **PDF Generation Success Rate** (0-100)
+   - Does wkhtmltopdf succeed consistently?
+   - Fallbacks working?
+   - Measured via: pdf_test.py
 
 ## Test Suite
-**Location:** `tests/test_categorization.py`
 
-**15 known PDFs** with expected categories:
-- Tech (4 PDFs): Programming, Linux, C++, Database
-- Cooking (4 PDFs): Fermentation, Cheese, Meat, Mushrooms
-- Health (3 PDFs): Nutrition, Yoga, Herbalism
-- Philosophy (2 PDFs): Kant, Nietzsche
-- Esoterik (2 PDFs): Chakras, Meditation, Tarot
+### Core Tests
+- **test_extraction.py**: Checks extraction logic (content, length, encoding)
+- **test_synthesize.py**: Checks 14b synthesis (relevance, structure)
+- **test_formatting.py**: Checks HTML/MD/PDF output (structure, links)
+- **test_categorization.py**: Checks BERT categorization (accuracy on known samples)
 
-**Run tests:**
+### Measurement Command
 ```bash
 cd ~/.openclaw/workspace/skills/pdf_zusammenfassung
-python -m pytest tests/test_categorization.py -v
+python -m pytest tests/ -v --tb=short > test_results.log 2>&1
+python tests/parse_metrics.py test_results.log
 ```
 
-## Database
-**Path:** `/media/overwrite/Datenplatte 2/pdf-index.db`
+This outputs:
+```
+METRIC: extraction_quality=95 link_validity=100 speed_ms=110000 pdf_success=98
+```
 
-**Backup created:** `pdf-index.db.backup-keyword-20260319-123000`
+## Hypotheses to Test
 
-**New columns added:**
-- `bert_confidence` (FLOAT) — Confidence score from BERT model
-- `category` (TEXT) — Existing column (updated in-place)
+### H1: Longer extraction window
+**Current:** Skip first 1000 chars, take 5000 total (chars 1000-5000)
+**Hypothesis:** Skip more metadata, take chars 2000-7000 for better content
 
-## Improvement Opportunities
+### H2: Better UTF-8 handling
+**Current:** iconv -f UTF-8 -t UTF-8 -c (lossy)
+**Hypothesis:** Use chardet to auto-detect encoding before converting
 
-### 1. Model Selection
-- **Current:** `distiluse-base-multilingual-cased-v2` (130MB, fast)
-- **Alternative 1:** `sentence-transformers/paraphrase-multilingual-mpnet-base-v2` (435MB, better accuracy)
-- **Alternative 2:** Fine-tuned German BERT (`dbmdz/bert-base-german-uncased`)
+### H3: Smarter content type detection
+**Current:** Simple heuristics (count keywords)
+**Hypothesis:** Use TF-IDF + more category keywords
 
-**Metric:** Test accuracy on 15-PDF test set
+### H4: Cache synthesized outputs
+**Current:** Hits 14b every time
+**Hypothesis:** Cache synthesis results by hash(content) for 1h
 
-### 2. Category Definitions
-- Improve label descriptions (more specific keywords)
-- Add category-specific examples
-- Adjust for ambiguous cases (e.g., "Meditation" appears in Philosophy AND Esoterik)
+### H5: Parallel PDF processing
+**Current:** Sequential extraction (pdf1, pdf2, pdf3...)
+**Hypothesis:** Use parallel pdftotext calls (max 4 concurrent)
 
-**Metric:** Test accuracy on 15-PDF test set
+## Core Logic File
 
-### 3. Similarity Threshold
-- Current threshold: 0.3 (if lower, classify as "general")
-- Adjust per-category thresholds (e.g., tech requires 0.4, esoterik allows 0.25)
+**File to modify:** `scripts/extract-content-v4.py`
 
-**Metric:** Test accuracy on 15-PDF test set
+Key functions:
+- `extract_from_pdf_text()` — Main extraction logic
+- `identify_content_type()` — Type detection
+- Implement improvements here only
 
-### 4. Content Window
-- Current: Use filename + first 300 chars of content
-- Try: Full first page, abstract, or TOC instead
-
-**Metric:** Test accuracy on 15-PDF test set
-
-### 5. Ensemble Methods
-- Combine multiple models (BERT + lexical keywords)
-- Vote-based categorization for ambiguous cases
-
-**Metric:** Test accuracy on 15-PDF test set
-
-## Workflow
-
-1. **Hypothesis:** "Model X + Category Definition Y will improve accuracy to Z%"
-2. **Modify:** `categorization-core.py`
-3. **Run Tests:**
-   ```bash
-   pytest tests/test_categorization.py -v
-   ```
-4. **Measure:** Accuracy ≥80% to pass
-5. **Log Results:** See results.tsv
-6. **Decide:** Keep (commit) or discard (revert)
-7. **Loop:** Go to step 1
-
-## Baseline Results (Keyword-Matching)
+## Branching Strategy
 
 ```
-Current Categorization (Keyword-Based):
-  tech        :  6873 PDFs (81.0%)
-  general     :   817 PDFs (9.6%)
-  health      :   405 PDFs (4.8%)
-  cooking     :   214 PDFs (2.5%)
-  philosophy  :    83 PDFs (1.0%)
-  esoterik    :    90 PDFs (1.1%)
-
-Known Issues:
-  ❌ Aleister Crowley books → tech (should be esoterik)
-  ❌ Apokalypse books → tech (should be philosophy)
-  ❌ C++ query → returns Apokalypse (semantic drift)
+master (v4.0 stable)
+  └── skill-improver/extraction-optimization (YOUR BRANCH)
+        ├── commit: h1-longer-window
+        ├── commit: h2-better-utf8
+        └── commit: h3-tfidf-detection
 ```
+
+If an experiment succeeds, keep commit on this branch. At the end, PR → master.
 
 ## Success Criteria
-- ✅ Test accuracy ≥95% on 15-PDF test set
-- ✅ No false positives for "Apokalypse" as tech
-- ✅ "Chakra" books correctly labeled as esoterik
-- ✅ All 8482 PDFs re-categorized in <5 min
-- ✅ New bert_confidence scores in database
+
+- **Extraction Quality:** Increase from 95 → 98+
+- **Link Validity:** Stay at 100
+- **Speed:** Stay <120s (accept slight increase for better quality)
+- **PDF Success:** Maintain 98+
+
+## How to Start
+
+1. Run baseline tests:
+   ```bash
+   python -m pytest tests/ -v
+   ```
+
+2. Extract baseline metric:
+   ```bash
+   python tests/parse_metrics.py test_results.log > baseline.txt
+   ```
+
+3. Create results.tsv:
+   ```
+   commit	metric	status	description
+   940ebc6	extraction=95,link=100,speed=110000,pdf=98	keep	v4.0 baseline
+   ```
+
+4. Start with H1 (longest window) — simplest change with likely impact
+
+5. Commit, test, log, decide → repeat
 
 ## Notes
-- Backup exists: Always safe to revert
-- Dry-run available: `--dry-run` flag
-- Sample testing: `--test 10` to test on 10 random PDFs
+
+- Only modify scripts/extract-content-v4.py during optimization
+- Don't change tests or SKILL.md
+- Use git commit messages like: "exp: h1-longer-extraction-window"
+- If a test breaks → git revert immediately, document failure
+- Aim for 5-10 iterations per session

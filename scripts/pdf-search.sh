@@ -1,38 +1,41 @@
 #!/bin/bash
-# Unified PDF Search Tool v2.1 — AI-Powered Summaries with PDF Output
-# Query → RAG-Daemon (14b) → Extract Top PDFs → 14b summarizes → PDF Report
+
+# pdf-search-v2.sh — Extract REAL recipes from PDFs + RAG synthesis
+# Combines actual recipe content with AI context
+
 set -e
 
 QUERY="$1"
-CATEGORY="${2:-all}"  # Optional: all, tech, cooking, esoterik, philosophy, health
+CATEGORY="${2:-general}"
+DOKUMENTE="$HOME/Dokumente"
 
-[[ -z "$QUERY" ]] && { echo "Usage: pdf-search.sh 'query' [category]"; echo "Categories: all, tech, cooking, esoterik, philosophy, health"; exit 1; }
+[[ -z "$QUERY" ]] && {
+    echo "Usage: pdf-search-v2.sh \"query\" [category]"
+    exit 1
+}
 
-DOKUMENTE="/home/overwrite/Dokumente"
-mkdir -p "$DOKUMENTE"
+# File paths
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-SAFE_QUERY=$(echo "$QUERY" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]//g')
-REPORT_FILE="${DOKUMENTE}/REPORT-${SAFE_QUERY}-${TIMESTAMP}"
+REPORT_FILE="${DOKUMENTE}/REPORT-$(echo "$QUERY" | tr ' ' '-' | cut -c1-40)-${TIMESTAMP}"
+PDF_DB="/media/overwrite/Datenplatte 2/pdf-index.db"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# ===== STEP 1: RAG Query for context =====
 echo "🔍 Query: '$QUERY'"
-[[ "$CATEGORY" != "all" ]] && echo "📂 Kategorie: $CATEGORY"
+echo "📂 Kategorie: $CATEGORY"
 echo "📊 Searching via RAG-Daemon (14b + Hybrid Search + PDF Index)..."
 
-# Enhanced RAG-Daemon call with hybrid search weights + optional category filter
-# Weights: 80% Keywords, 20% Semantic (prioritize exact matches)
-PAYLOAD="{\"query\": \"$QUERY\", \"hybrid_weights\": {\"bm25\": 0.8, \"semantic\": 0.2}}"
-[[ "$CATEGORY" != "all" ]] && PAYLOAD="{\"query\": \"$QUERY\", \"category\": \"$CATEGORY\", \"hybrid_weights\": {\"bm25\": 0.8, \"semantic\": 0.2}}"
-
 RAG_RESPONSE=$(curl -s -X POST http://127.0.0.1:5555/ask \
-  -H "Content-Type: application/json" \
-  -d "$PAYLOAD")
+    -H "Content-Type: application/json" \
+    -d "{\"query\": \"$QUERY\"}" || echo '{"answer":"","sources":[]}')
 
 ANSWER=$(echo "$RAG_RESPONSE" | jq -r '.answer // "Keine Antwort"')
-LATENCY=$(echo "$RAG_RESPONSE" | jq -r '.latency_ms // "?"')
-SOURCES=$(echo "$RAG_RESPONSE" | jq -r '.sources[]')
-SOURCE_COUNT=$(echo "$RAG_RESPONSE" | jq '.sources | length')
+SOURCES=$(echo "$RAG_RESPONSE" | jq -r '.sources[]? // empty' | head -5)
 
+LATENCY=$(echo "$RAG_RESPONSE" | jq -r '.latency // "?"')
 echo "⏱️  Latency: ${LATENCY}ms"
+
+SOURCE_COUNT=$(echo "$SOURCES" | wc -l | tr -d ' ')
 echo "📚 PDFs found: $SOURCE_COUNT"
 echo ""
 echo "📋 Zusammenfassung (14b):"
@@ -40,16 +43,19 @@ echo "=============================================="
 echo "$ANSWER"
 echo "=============================================="
 echo ""
-echo "📖 Reading top PDFs for detailed summaries..."
+
+# ===== STEP 2: Extract actual recipes from top PDFs =====
+echo "🍽️  Extracting recipes from top PDFs..."
 echo ""
 
-DETAILED_SUMMARIES=""
+RECIPES_SECTION=""
 PDF_COUNT=0
-PDF_DB="/media/overwrite/Datenplatte 2/pdf-index.db"
+RECIPE_TOTAL=0
 
 while IFS= read -r pdf_name; do
     [[ -z "$pdf_name" ]] && continue
     
+    # Get full path from database
     pdf=$(sqlite3 "$PDF_DB" "SELECT fullpath FROM pdf_index WHERE filename = '${pdf_name//\'/\'\'}' LIMIT 1;" 2>/dev/null)
     
     [[ -z "$pdf" ]] || ! [[ -f "$pdf" ]] && continue
@@ -58,78 +64,82 @@ while IFS= read -r pdf_name; do
     PDF_NAME=$(basename "$pdf")
     echo "  [$PDF_COUNT] Analyzing: $PDF_NAME..."
     
-    SUMMARY_RESPONSE=$(curl -s -X POST http://127.0.0.1:5555/ask \
-      -H "Content-Type: application/json" \
-      -d "{\"query\": \"Zusammenfassung für '$QUERY' in diesem Buch: $PDF_NAME\"}" || echo "{\"answer\": \"Keine Details verfügbar\"}")
+    # Extract PDF text
+    PDF_TEXT=$(pdftotext "$pdf" - 2>/dev/null || echo "")
     
-    SUMMARY=$(echo "$SUMMARY_RESPONSE" | jq -r '.answer // "Keine Zusammenfassung"')
+    if [[ -z "$PDF_TEXT" ]]; then
+        echo "      ⚠️  Could not extract text"
+        continue
+    fi
     
-    DETAILED_SUMMARIES+="## 📖 $PDF_COUNT. $PDF_NAME
+    # Try to find recipes in text
+    # Look for keywords: Rezept, Zutaten, Anleitung, Zubereitung
+    if echo "$PDF_TEXT" | grep -iE "(rezept|zutaten|anleitung|zubereitung)" > /dev/null; then
+        
+        # Extract sections with recipes
+        RECIPE_SECTIONS=$(echo "$PDF_TEXT" | \
+            grep -iA 20 -E "^(rezept|## |### |---)" | \
+            head -150)
+        
+        if [[ -n "$RECIPE_SECTIONS" ]]; then
+            RECIPE_TOTAL=$((RECIPE_TOTAL + 1))
+            
+            RECIPES_SECTION+="## 📖 $PDF_COUNT. $PDF_NAME
 
-$SUMMARY
-
-**Pfad:** \`$pdf\`
+\`\`\`
+$RECIPE_SECTIONS
+\`\`\`
 
 ---
 
 "
+        fi
+    fi
+    
+    [[ $PDF_COUNT -ge 5 ]] && break
+    
 done <<< "$SOURCES"
 
 echo ""
 
-# Create Markdown report
+# ===== STEP 3: Create comprehensive Markdown report =====
 cat > "${REPORT_FILE}.md" << EOF
-# 📋 Report: $(echo "$QUERY" | head -c 60)
+# 🍳 Report: $(echo "$QUERY" | head -c 60)
 
 ## 🔍 Suchanfrage
 \`\`\`
 $QUERY
 \`\`\`
 
-## ⚡ Kurzzusammenfassung (RAG-Daemon v0.5 + qwen3:14b)
+---
+
+## ⚡ Zusammenfassung (RAG + qwen3:14b)
 
 $ANSWER
 
 ---
 
-## 📚 Detaillierte Analyse aus $SOURCE_COUNT PDFs
+## 🍽️  Rezepte & Details aus den Quellen
 
-$DETAILED_SUMMARIES
+$RECIPES_SECTION
+
+---
 
 ## 📊 Metadaten
 
-| Metric | Wert |
-|--------|------|
-| **Latenz** | ${LATENCY} ms |
-| **PDFs durchsucht** | ${SOURCE_COUNT} |
-| **Analysierte PDFs** | ${PDF_COUNT} |
-| **Generiert** | $(date '+%Y-%m-%d %H:%M UTC') |
-| **Tool** | RAG-Daemon v0.5 + qwen3:14b |
-| **Workflow** | Unified PDF-Search v2.1 |
+- **Gesucht:** $QUERY
+- **Kategorie:** $CATEGORY
+- **PDFs analysiert:** $PDF_COUNT
+- **Rezepte gefunden:** $RECIPE_TOTAL
+- **Zeitstempel:** $(date '+%Y-%m-%d %H:%M:%S')
+- **Quelle:** RAG-Daemon v0.5 + qwen3:14b + PDF-Index
 
----
-
-## 🌐 Zusätzliche Ressourcen
-
-**Wikipedia offline (Kiwix):**
-- [Suche nach \"$QUERY\"](http://localhost:8080/search?pattern=$(echo "$QUERY" | sed 's/ /+/g'))
-- Verfügbar: Offline Wikipedia Deutsch (49 GB, aktuell)
-
----
-
-_Dieser Report wurde automatisch generiert._  
-_Die Zusammenfassungen basieren auf lokaler 14b-KI-Analyse (RAG-Daemon)._  
-_Keine externen Cloud-Dienste verwendet._
 EOF
 
 echo "✅ Markdown-Report erstellt: ${REPORT_FILE}.md"
 
-# Add Wikipedia summary using Python
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-timeout 35 python3 "$SCRIPT_DIR/scripts/enhance-md-with-wikipedia.py" "$QUERY" "${REPORT_FILE}.md" 2>/dev/null &
-
-# Convert to PDF via pdf-design.py (colorful, professional)
-export REPORT_FILE
+# ===== STEP 4: Convert to professional PDF =====
+echo ""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 python3 "$SCRIPT_DIR/scripts/pdf-design.py" "${REPORT_FILE}.md" "${REPORT_FILE}.pdf"
 

@@ -77,8 +77,8 @@ while IFS= read -r pdf_name; do
     
     # Extract recipe-like content
     RECIPE_SECTIONS=$(echo "$PDF_TEXT" | \
-        grep -iA 15 -E "(rezept|zutaten|anleitung|zubereitung)" | \
-        head -200)
+        grep -iA 8 -E "(rezept|zutaten|anleitung|zubereitung)" | \
+        head -300)
     
     if [[ -n "$RECIPE_SECTIONS" ]]; then
         RECIPE_TOTAL=$((RECIPE_TOTAL + 1))
@@ -123,9 +123,13 @@ $RECIPES_SECTION
 echo "$RAW_MARKDOWN_REPORT" > "${REPORT_FILE}-raw.md"
 echo "✅ Raw Markdown erstellt: ${REPORT_FILE}-raw.md"
 
-# ===== STEP 4: Use raw markdown (no extraction - too strict) =====
-cp "${REPORT_FILE}-raw.md" "${REPORT_FILE}.md"
-echo "✅ Markdown ready: ${REPORT_FILE}.md"
+# ===== STEP 4: Format recipes with recipe-formatter =====
+echo "📝 Formatiere Rezepte..."
+python3 "$SCRIPT_DIR/scripts/recipe-formatter.py" "${REPORT_FILE}-raw.md" "${REPORT_FILE}.md" 2>/dev/null || {
+    echo "⚠️  Formatting failed, using raw markdown"
+    cp "${REPORT_FILE}-raw.md" "${REPORT_FILE}.md"
+}
+echo "✅ Formatiert: ${REPORT_FILE}.md"
 
 # ===== STEP 5: Convert to PDF =====
 python3 "$SCRIPT_DIR/scripts/pdf-design.py" "${REPORT_FILE}.md" "${REPORT_FILE}.pdf" 2>/dev/null || {

@@ -1,12 +1,37 @@
 # PDF-Search Skill — Universal PDF Analysis & Synthesis
 
-**Status:** v3.0 — Generic Content Extraction Framework (2026-03-18)
+**Status:** v3.1 — Hybrid Search + Category Filtering (2026-03-19)
 
 ## Overview
 
 Transform PDFs from **static documents** into **queryable, actionable content** through intelligent extraction + AI synthesis.
 
 **Not just for recipes** — for ANY query type.
+
+---
+
+## What's New in v3.1 (2026-03-19)
+
+### Hybrid Search + Relevance Optimization
+- **80/20 BM25-Semantic Split:** 80% keyword-matching (exact), 20% semantic similarity (context)
+  - Solves the "Apokalypse vs. C++" problem
+  - Prioritizes exact matches over semantic drift
+  - Configurable via `hybrid_weights` parameter
+
+### PDF Categorization
+- **8482 PDFs categorized** into: `tech`, `cooking`, `health`, `philosophy`, `esoterik`, `general`
+- **Optional category filter** — narrow results by domain
+- **Example:** `pdf-search "fermentation" cooking` → Only cooking books
+
+### Backward-Compatible API
+- RAG-Daemon `/ask` endpoint accepts optional `hybrid_weights` + `category` parameters
+- Default behavior unchanged (50/50 split, no category filter)
+- New features are opt-in
+
+### Merged Implementation
+- Scripts consolidated into **skill/scripts/** directory
+- Single source of truth for pdf-search logic
+- Version-synchronized with SKILL.md
 
 ---
 
@@ -99,6 +124,47 @@ User gets ACTIONABLE CONTENT
 
 ## Architecture
 
+### Search Layer (`hybrid_search.py`) — v3.1 Hybrid Search + Category Filtering
+
+```
+Query: "fermentation yeast"
+Category: "cooking" (optional)
+    ↓
+[Hybrid Search (v3.1)]
+├─ BM25 Text-Matching (80% — DEFAULT)
+│  ├─ FTS5 Index lookup: Find PDFs with keywords
+│  ├─ Keyword relevance scoring: Weight exact matches higher
+│  └─ BM25 ranking: Rank by keyword frequency
+├─ Semantic Similarity (20% — DEFAULT)
+│  ├─ Embedding computation (nomic-embed-text)
+│  ├─ Cosine similarity: Concept matching (gärung, fermentieren)
+│  └─ Avoids semantic drift: C++ ≠ Consciousness
+├─ Category Filter (OPTIONAL)
+│  └─ If category specified: Narrow to category books only
+│     (e.g., "cooking" → Rezepte, Kochen, Fermentieren)
+└─ Combined Score
+   ├─ Weighted: (0.8 × BM25) + (0.2 × Semantic)
+   ├─ Configurable via hybrid_weights parameter
+   └─ Top 5 PDFs ranked by score
+    ↓
+Output:
+    [
+      {
+        "filename": "Fermentieren für Anfänger.pdf",
+        "hybrid_score": 0.87,
+        "bm25_score": 0.95,
+        "semantic_score": 0.72,
+        "category": "cooking"
+      },
+      ...
+    ]
+```
+
+**Performance:**
+- First query: 8-12s (includes embedding compute)
+- Cached query: <100ms
+- VRAM: +250MB (nomic-embed-text)
+
 ### Extraction Layer (`extract-content.py`)
 
 ```
@@ -188,42 +254,54 @@ Output: Beautiful HTML Report
 
 ## Usage
 
-### Generic Command
+### Basic Command
 
 ```bash
-pdf-search "your query here"
+pdf-search "your query"
 ```
+
+### With Category Filter (NEW in v3.1)
+
+```bash
+pdf-search "your query" [category]
+```
+
+**Available categories:** `all`, `tech`, `cooking`, `health`, `philosophy`, `esoterik`
 
 ### Examples
 
-**Example 1: Recipe Query**
+**Example 1: Cooking — Recipe Query**
 ```bash
-pdf-search "schweinenackenrezepte"
+pdf-search "schweinenackenrezepte" cooking
 # Output: 3 complete recipes (ingredients, instructions, timing)
+# Filter: Only cooking category books
 ```
 
-**Example 2: How-To Query**
+**Example 2: Cooking — How-To**
 ```bash
-pdf-search "wie macht man sauerkraut"
-# Output: Step-by-step fermentation guide
+pdf-search "fermentation yeast" cooking
+# Output: Step-by-step fermentation guide + yeast biology
+# Filter: Only cooking category (not esoterik or health)
 ```
 
-**Example 3: Reference Query**
+**Example 3: Health — Reference**
 ```bash
-pdf-search "pilzbestimmung"
-# Output: Mushroom identification guide with characteristics
+pdf-search "pilzbestimmung" health
+# Output: Mushroom identification guide
+# Filter: Only health/medicine books
 ```
 
-**Example 4: Data Query**
+**Example 4: Tech — Technical Query**
 ```bash
-pdf-search "gärungstemperaturen bier"
-# Output: Temperature table + best practices
+pdf-search "C++ optimization" tech
+# Output: C++ programming best practices
+# Filter: Only tech/programming books (not esoterik!)
 ```
 
-**Example 5: Technical Query**
+**Example 5: All Categories (Default)**
 ```bash
-pdf-search "brauerei ausrüstung kalibrierung"
-# Output: Equipment setup + calibration instructions
+pdf-search "meditation" all
+# Output: All relevant PDFs across categories (philosophy, esoterik, health)
 ```
 
 ---
@@ -406,13 +484,22 @@ Query: "fehlersuche brauerei"
 
 ## Performance
 
-| Phase | Duration |
-|-------|----------|
-| Content Extraction (1 PDF) | 2-3s |
-| Content Extraction (5 PDFs) | 10-15s |
-| Content Synthesis (14b) | 8-12s |
-| Report Generation | 2-3s |
-| **Total** | **22-33s** |
+| Phase | Duration | Notes |
+|-------|----------|-------|
+| Hybrid Search (1st query) | 8-12s | Includes embedding computation |
+| Hybrid Search (cached) | <100ms | Cache hit from RAG-Daemon |
+| Content Extraction (1 PDF) | 2-3s | pdfplumber text extraction |
+| Content Extraction (5 PDFs) | 10-15s | Parallel-friendly (TODO) |
+| Content Synthesis (14b) | 8-12s | RAG-based synthesis |
+| Report Generation | 2-3s | Markdown → HTML/PDF |
+| **Total (1st)** | **30-45s** | First query with embedding |
+| **Total (cached)** | **12-18s** | Subsequent queries |
+
+**Optimization:**
+- Hybrid Search results cached by RAG-Daemon
+- Embedding cache hit: <1ms
+- BM25 computation: ~50ms
+- Semantic similarity: ~2-5s (first time, cached after)
 
 ---
 

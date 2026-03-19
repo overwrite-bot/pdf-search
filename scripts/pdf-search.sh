@@ -1,112 +1,83 @@
 #!/bin/bash
-
-# PDF-Search v3.0 — Universal PDF Analysis & Content Synthesis
-# Supports: Recipes, How-To Guides, References, Data Tables, Technical Documentation
-# Usage: pdf-search "your query here"
-
+# Unified PDF Search Tool v2.1 — AI-Powered Summaries with PDF Output
+# Query → RAG-Daemon (14b) → Extract Top PDFs → 14b summarizes → PDF Report
 set -e
 
 QUERY="$1"
-SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CATEGORY="${2:-all}"  # Optional: all, tech, cooking, esoterik, philosophy, health
 
-if [[ -z "$QUERY" ]]; then
-    echo "Usage: pdf-search 'query'"
-    echo "Examples:"
-    echo "  pdf-search 'Schweinenackenrezepte'"
-    echo "  pdf-search 'Wie macht man Kimchi'"
-    echo "  pdf-search 'Pilzbestimmung'"
-    echo "  pdf-search 'Gärungstemperaturen'"
-    echo "  pdf-search 'Brauerei-Kalibrierung'"
-    exit 1
-fi
+[[ -z "$QUERY" ]] && { echo "Usage: pdf-search.sh 'query' [category]"; echo "Categories: all, tech, cooking, esoterik, philosophy, health"; exit 1; }
 
-# Directories
-DOKUMENTE="${HOME}/Dokumente"
+DOKUMENTE="/home/overwrite/Dokumente"
 mkdir -p "$DOKUMENTE"
-
-# Timestamp
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 SAFE_QUERY=$(echo "$QUERY" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]//g')
 REPORT_FILE="${DOKUMENTE}/REPORT-${SAFE_QUERY}-${TIMESTAMP}"
-TEMP_EXTRACT="${DOKUMENTE}/.extract-${TIMESTAMP}.json"
-TEMP_SYNTHESIS="${DOKUMENTE}/.synthesis-${TIMESTAMP}.json"
 
 echo "🔍 Query: '$QUERY'"
-echo "📊 Searching via RAG-Daemon..."
-echo "   Datensammlung:"
-echo "     ✓ memory.db (11.5k lokale Notizen)"
-echo "     ✓ kb.db (Knowledge Base)"
-echo "     ✓ pdf-index.db (8481 PDFs, FTS5)"
-echo "     ✓ Kiwix (49 GB Wikipedia)"
-echo ""
+[[ "$CATEGORY" != "all" ]] && echo "📂 Kategorie: $CATEGORY"
+echo "📊 Searching via RAG-Daemon (14b + Hybrid Search + PDF Index)..."
 
-# ============================================================================
-# PHASE 1: RAG-Daemon Query (find relevant PDFs)
-# ============================================================================
+# Enhanced RAG-Daemon call with hybrid search weights + optional category filter
+# Weights: 80% Keywords, 20% Semantic (prioritize exact matches)
+PAYLOAD="{\"query\": \"$QUERY\", \"hybrid_weights\": {\"bm25\": 0.8, \"semantic\": 0.2}}"
+[[ "$CATEGORY" != "all" ]] && PAYLOAD="{\"query\": \"$QUERY\", \"category\": \"$CATEGORY\", \"hybrid_weights\": {\"bm25\": 0.8, \"semantic\": 0.2}}"
 
 RAG_RESPONSE=$(curl -s -X POST http://127.0.0.1:5555/ask \
   -H "Content-Type: application/json" \
-  -d "{\"query\": \"$QUERY\"}" || echo "{\"answer\": \"Error contacting RAG-Daemon\", \"sources\": [], \"latency_ms\": 0}")
+  -d "$PAYLOAD")
 
 ANSWER=$(echo "$RAG_RESPONSE" | jq -r '.answer // "Keine Antwort"')
 LATENCY=$(echo "$RAG_RESPONSE" | jq -r '.latency_ms // "?"')
-SOURCES=$(echo "$RAG_RESPONSE" | jq -r '.sources[]?' 2>/dev/null || echo "")
-SOURCE_COUNT=$(echo "$RAG_RESPONSE" | jq '.sources | length' 2>/dev/null || echo 0)
+SOURCES=$(echo "$RAG_RESPONSE" | jq -r '.sources[]')
+SOURCE_COUNT=$(echo "$RAG_RESPONSE" | jq '.sources | length')
 
 echo "⏱️  Latency: ${LATENCY}ms"
 echo "📚 PDFs found: $SOURCE_COUNT"
-
-# ============================================================================
-# PHASE 2: Content Extraction (all types) — Get actual PDF content
-# ============================================================================
-
 echo ""
-echo "📖 Extracting content from PDFs..."
+echo "📋 Zusammenfassung (14b):"
+echo "=============================================="
+echo "$ANSWER"
+echo "=============================================="
+echo ""
+echo "📖 Reading top PDFs for detailed summaries..."
+echo ""
 
-PDF_CONTENT=""
+DETAILED_SUMMARIES=""
 PDF_COUNT=0
-PDF_SOURCES_LIST=""
+PDF_DB="/media/overwrite/Datenplatte 2/pdf-index.db"
 
-while IFS= read -r pdf; do
-    if [[ -z "$pdf" ]] || ! [[ -f "$pdf" ]]; then
-        continue
-    fi
+while IFS= read -r pdf_name; do
+    [[ -z "$pdf_name" ]] && continue
+    
+    pdf=$(sqlite3 "$PDF_DB" "SELECT fullpath FROM pdf_index WHERE filename = '${pdf_name//\'/\'\'}' LIMIT 1;" 2>/dev/null)
+    
+    [[ -z "$pdf" ]] || ! [[ -f "$pdf" ]] && continue
     
     PDF_COUNT=$((PDF_COUNT + 1))
-    [[ $PDF_COUNT -gt 5 ]] && break  # Limit to top 5
-    
     PDF_NAME=$(basename "$pdf")
-    echo "  [$PDF_COUNT] Reading: $PDF_NAME..."
+    echo "  [$PDF_COUNT] Analyzing: $PDF_NAME..."
     
-    # Extract text from PDF using pdftotext
-    PDF_TEXT=$(pdftotext "$pdf" - 2>/dev/null | head -800)  # First 800 lines
+    SUMMARY_RESPONSE=$(curl -s -X POST http://127.0.0.1:5555/ask \
+      -H "Content-Type: application/json" \
+      -d "{\"query\": \"Zusammenfassung für '$QUERY' in diesem Buch: $PDF_NAME\"}" || echo "{\"answer\": \"Keine Details verfügbar\"}")
     
-    if [[ ! -z "$PDF_TEXT" ]]; then
-        PDF_SOURCES_LIST+="### 📖 $PDF_NAME
+    SUMMARY=$(echo "$SUMMARY_RESPONSE" | jq -r '.answer // "Keine Zusammenfassung"')
+    
+    DETAILED_SUMMARIES+="## 📖 $PDF_COUNT. $PDF_NAME
 
-\`\`\`
-$PDF_TEXT
-\`\`\`
+$SUMMARY
+
+**Pfad:** \`$pdf\`
 
 ---
 
 "
-    fi
 done <<< "$SOURCES"
 
-echo "✅ Extracted $PDF_COUNT PDFs"
-
-echo "   Content Type: $CONTENT_TYPE"
-echo "   Confidence: $SYNTHESIS_CONFIDENCE"
-
-# ============================================================================
-# PHASE 4: Generate Report
-# ============================================================================
-
 echo ""
-echo "📝 Generating report..."
 
-# Create markdown report with PDF content
+# Create Markdown report
 cat > "${REPORT_FILE}.md" << EOF
 # 📋 Report: $(echo "$QUERY" | head -c 60)
 
@@ -115,76 +86,85 @@ cat > "${REPORT_FILE}.md" << EOF
 $QUERY
 \`\`\`
 
----
-
-## 💡 Antwort
+## ⚡ Kurzzusammenfassung (RAG-Daemon v0.5 + qwen3:14b)
 
 $ANSWER
 
 ---
 
-## 📄 Inhalte aus PDF-Quellen
+## 📚 Detaillierte Analyse aus $SOURCE_COUNT PDFs
 
-$PDF_SOURCES_LIST
+$DETAILED_SUMMARIES
+
+## 📊 Metadaten
+
+| Metric | Wert |
+|--------|------|
+| **Latenz** | ${LATENCY} ms |
+| **PDFs durchsucht** | ${SOURCE_COUNT} |
+| **Analysierte PDFs** | ${PDF_COUNT} |
+| **Generiert** | $(date '+%Y-%m-%d %H:%M UTC') |
+| **Tool** | RAG-Daemon v0.5 + qwen3:14b |
+| **Workflow** | Unified PDF-Search v2.1 |
 
 ---
 
-_Report generiert mit PDF-Search v3.0._
+_Dieser Report wurde automatisch generiert._  
+_Die Zusammenfassungen basieren auf lokaler 14b-KI-Analyse (RAG-Daemon)._  
+_Keine externen Cloud-Dienste verwendet._
 EOF
 
-echo "✅ Markdown created: ${REPORT_FILE}.md"
+echo "✅ Markdown-Report erstellt: ${REPORT_FILE}.md"
 
-# ============================================================================
-# PHASE 5: Convert Markdown to PDF with LibreOffice
-# ============================================================================
+# Convert to PDF via reportlab (pass via env)
+export REPORT_FILE
+python3 << 'PYTHON_END'
+import sys
+import os
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    
+    md_file = os.environ.get('REPORT_FILE') + '.md'
+    pdf_file = os.environ.get('REPORT_FILE') + '.pdf'
+    
+    with open(md_file, 'r', encoding='utf-8') as f:
+        md_content = f.read()
+    
+    doc = SimpleDocTemplate(pdf_file, pagesize=A4, topMargin=2*cm, bottomMargin=2*cm)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    for line in md_content.split('\n'):
+        if line.startswith('# '):
+            story.append(Paragraph(line[2:], styles['Heading1']))
+        elif line.startswith('## '):
+            story.append(Paragraph(line[3:], styles['Heading2']))
+        elif line.startswith('### '):
+            story.append(Paragraph(line[4:], styles['Heading3']))
+        elif line.strip():
+            story.append(Paragraph(line, styles['Normal']))
+        else:
+            story.append(Spacer(1, 0.2*cm))
+    
+    doc.build(story)
+    print(f"✅ PDF created: {pdf_file}")
+except ImportError:
+    print("⚠️  reportlab not available")
+except Exception as e:
+    print(f"⚠️  PDF failed: {e}")
 
-echo ""
-echo "📄 Converting to PDF..."
-
-# Method 1: LibreOffice snap (if available)
-if command -v /snap/bin/libreoffice &> /dev/null; then
-    /snap/bin/libreoffice --headless --convert-to pdf:writer_pdf_Export \
-      --outdir "$DOKUMENTE" "${REPORT_FILE}.md" 2>/dev/null
-    if [[ $? -eq 0 ]]; then
-        echo "✅ PDF created with LibreOffice Snap"
-        PDF_FILE="${DOKUMENTE}/$(basename ${REPORT_FILE}).pdf"
-    fi
-fi
-
-# Method 2: System LibreOffice (if snap failed)
-if [[ ! -f "$PDF_FILE" ]] && command -v libreoffice &> /dev/null; then
-    libreoffice --headless --convert-to pdf:writer_pdf_Export \
-      --outdir "$DOKUMENTE" "${REPORT_FILE}.md" 2>/dev/null
-    if [[ $? -eq 0 ]]; then
-        echo "✅ PDF created with LibreOffice"
-        PDF_FILE="${DOKUMENTE}/$(basename ${REPORT_FILE}).pdf"
-    fi
-fi
-
-# ============================================================================
-# PHASE 6: Display Report in PDF Viewer
-# ============================================================================
+PYTHON_END
 
 echo ""
 echo "✅ REPORT COMPLETE:"
-if [[ -f "$PDF_FILE" ]]; then
-    ls -lh "$PDF_FILE"
-    echo "📂 Saved: $(basename ${REPORT_FILE}).pdf"
-    echo ""
-    # Open PDF in evince
-    DISPLAY=:1 evince "$PDF_FILE" &
-    echo "📖 Opening in PDF viewer..."
-else
-    ls -lh "${REPORT_FILE}".md
-    echo "📂 Saved: $(basename ${REPORT_FILE}).md (Markdown fallback)"
-    echo ""
-    # Fallback: open markdown
-    DISPLAY=:1 xdg-open "${REPORT_FILE}.md" &
-    echo "📖 Opening..."
+if [[ -f "${REPORT_FILE}.pdf" ]]; then
+    ls -lh "${REPORT_FILE}.pdf"
+    echo "   📋 PDF: ${REPORT_FILE}.pdf"
+    DISPLAY=:1 evince "${REPORT_FILE}.pdf" 2>/dev/null &
+    echo "📺 Opening PDF in evince..."
 fi
-
-# Cleanup temp files
-rm -f "$TEMP_EXTRACT" "$TEMP_SYNTHESIS" 2>/dev/null
-
-echo ""
-echo "✅ Done (v3.0 framework)"
+echo "   📝 Markdown: ${REPORT_FILE}.md"
+echo "   📂 Location: $DOKUMENTE"

@@ -128,15 +128,16 @@ echo "✅ Markdown-Report erstellt: ${REPORT_FILE}.md"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 timeout 35 python3 "$SCRIPT_DIR/scripts/enhance-md-with-wikipedia.py" "$QUERY" "${REPORT_FILE}.md" 2>/dev/null &
 
-# Convert to PDF via reportlab (pass via env)
+# Convert to PDF via reportlab (professional styled)
 export REPORT_FILE
 python3 << 'PYTHON_END'
-import sys
-import os
+import sys, os
 try:
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import cm
+    from reportlab.lib.enums import TA_JUSTIFY
+    from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     
     md_file = os.environ.get('REPORT_FILE') + '.md'
@@ -145,28 +146,29 @@ try:
     with open(md_file, 'r', encoding='utf-8') as f:
         md_content = f.read()
     
-    doc = SimpleDocTemplate(pdf_file, pagesize=A4, topMargin=2*cm, bottomMargin=2*cm)
     styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='Body', fontSize=11, alignment=TA_JUSTIFY, spaceAfter=8))
+    
+    doc = SimpleDocTemplate(pdf_file, pagesize=A4, topMargin=2.5*cm, bottomMargin=2.5*cm)
     story = []
     
     for line in md_content.split('\n'):
         if line.startswith('# '):
             story.append(Paragraph(line[2:], styles['Heading1']))
+            story.append(Spacer(1, 0.3*cm))
         elif line.startswith('## '):
             story.append(Paragraph(line[3:], styles['Heading2']))
         elif line.startswith('### '):
             story.append(Paragraph(line[4:], styles['Heading3']))
         elif line.strip():
-            story.append(Paragraph(line, styles['Normal']))
+            story.append(Paragraph(line, styles['Body']))
         else:
-            story.append(Spacer(1, 0.2*cm))
+            story.append(Spacer(1, 0.1*cm))
     
     doc.build(story)
     print(f"✅ PDF created: {pdf_file}")
-except ImportError:
-    print("⚠️  reportlab not available")
 except Exception as e:
-    print(f"⚠️  PDF failed: {e}")
+    print(f"⚠️  PDF: {e}")
 
 PYTHON_END
 

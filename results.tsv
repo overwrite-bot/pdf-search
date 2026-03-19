@@ -3,3 +3,4 @@ commit	metric	status	description
 459da47	extraction=100,link=100,speed=0,pdf=100	keep	h1-longer-extraction-window (tests pass, content coverage +25%)
 abd5d72	extraction=100,link=100,speed=0,pdf=100	keep	h2-better-utf8-handling (chardet, graceful fallback)
 47986bc	extraction=100,link=100,speed=0,pdf=100	keep	h3-h5-advanced (tfidf detector, synthesis cache, parallel extractor)
+40d28f6	extraction=100,link=100,speed=100,pdf=100	keep	h6-url-encode-file-links (clickable links in HTML/MD)

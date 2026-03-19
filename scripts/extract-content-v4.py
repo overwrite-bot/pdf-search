@@ -8,6 +8,8 @@ Pure heuristic, no LLM.
 
 import re
 import json
+import sys
+from pathlib import Path
 from pathlib import Path
 
 def identify_content_type(text):
@@ -200,11 +202,43 @@ def extract_narrative(text):
     return content
 
 
+def fix_encoding(text):
+    """
+    Fix encoding issues using chardet (if available) or fallback to iconv.
+    H2 Experiment: Better UTF-8 handling
+    """
+    try:
+        import chardet
+        detected = chardet.detect(text.encode() if isinstance(text, str) else text)
+        if detected and detected.get('encoding'):
+            # Try to decode with detected encoding, fallback to utf-8
+            try:
+                if isinstance(text, str):
+                    return text
+                else:
+                    return text.decode(detected['encoding'], errors='replace')
+            except:
+                pass
+    except ImportError:
+        pass
+    
+    # Fallback: clean invalid UTF-8 sequences
+    if isinstance(text, bytes):
+        text = text.decode('utf-8', errors='replace')
+    else:
+        text = text.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+    
+    return text
+
+
 def extract_from_pdf_text(pdf_text, pdf_name, pdf_path=None):
     """
     Extract content from raw PDF text.
     Returns: {pdf_name, pdf_path, content_type, raw_content}
     """
+    # H2 Experiment: Better UTF-8 handling before extraction
+    pdf_text = fix_encoding(pdf_text)
+    
     # Skip more metadata/TOC (first 2000 chars more aggressive)
     # Then take next 5000 chars (more content, less metadata)
     # Total: up to 5000 chars per PDF (even better content coverage)

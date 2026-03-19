@@ -124,8 +124,9 @@ EOF
 
 echo "✅ Markdown-Report erstellt: ${REPORT_FILE}.md"
 
-# Add Wikipedia summary in background
-bash /tmp/add-wiki-to-md.sh "$QUERY" "${REPORT_FILE}.md" 2>/dev/null &
+# Add Wikipedia summary using Python
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+timeout 35 python3 "$SCRIPT_DIR/scripts/enhance-md-with-wikipedia.py" "$QUERY" "${REPORT_FILE}.md" 2>/dev/null &
 
 # Convert to PDF via reportlab (pass via env)
 export REPORT_FILE

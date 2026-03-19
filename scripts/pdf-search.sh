@@ -109,6 +109,14 @@ $DETAILED_SUMMARIES
 
 ---
 
+## 🌐 Zusätzliche Ressourcen
+
+**Wikipedia offline (Kiwix):**
+- [Suche nach \"$QUERY\"](http://localhost:8080/search?pattern=$(echo "$QUERY" | sed 's/ /+/g'))
+- Verfügbar: Offline Wikipedia Deutsch (49 GB, aktuell)
+
+---
+
 _Dieser Report wurde automatisch generiert._  
 _Die Zusammenfassungen basieren auf lokaler 14b-KI-Analyse (RAG-Daemon)._  
 _Keine externen Cloud-Dienste verwendet._

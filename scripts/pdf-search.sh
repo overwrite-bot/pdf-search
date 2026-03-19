@@ -123,13 +123,9 @@ $RECIPES_SECTION
 echo "$RAW_MARKDOWN_REPORT" > "${REPORT_FILE}-raw.md"
 echo "✅ Raw Markdown erstellt: ${REPORT_FILE}-raw.md"
 
-# ===== STEP 4: Structure recipes with smart extraction =====
-echo "🧠 Strukturiere Rezepte..."
-python3 "$SCRIPT_DIR/scripts/extract-recipes-v3.py" "${REPORT_FILE}-raw.md" > "${REPORT_FILE}.md" 2>/dev/null || {
-    echo "⚠️  Extraction failed, using raw markdown"
-    cp "${REPORT_FILE}-raw.md" "${REPORT_FILE}.md"
-}
-echo "✅ Strukturiert: ${REPORT_FILE}.md"
+# ===== STEP 4: Use raw markdown (no extraction - too strict) =====
+cp "${REPORT_FILE}-raw.md" "${REPORT_FILE}.md"
+echo "✅ Markdown ready: ${REPORT_FILE}.md"
 
 # ===== STEP 5: Convert to PDF =====
 python3 "$SCRIPT_DIR/scripts/pdf-design.py" "${REPORT_FILE}.md" "${REPORT_FILE}.pdf" 2>/dev/null || {

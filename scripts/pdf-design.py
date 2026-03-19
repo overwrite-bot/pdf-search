@@ -112,6 +112,44 @@ def create_professional_pdf(md_file, pdf_file):
     ))
     
     styles.add(ParagraphStyle(
+        name='RecipeTitle',
+        parent=styles['Heading3'],
+        fontSize=13,
+        textColor=colors.HexColor('#cc6600'),
+        spaceAfter=6,
+        spaceBefore=10,
+        fontName='Helvetica-Bold'
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='RecipeMetadata',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.HexColor('#666666'),
+        spaceAfter=8,
+        fontName='Helvetica-Oblique'
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='RecipeIngredient',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=4,
+        textColor=colors.HexColor('#555555'),
+        leftIndent=15
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='RecipeInstruction',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=5,
+        textColor=colors.HexColor('#444444'),
+        leftIndent=20,
+        lineHeight=1.5
+    ))
+    
+    styles.add(ParagraphStyle(
         name='CustomBullet',
         parent=styles['Normal'],
         fontSize=11,
@@ -165,17 +203,45 @@ def create_professional_pdf(md_file, pdf_file):
             story.append(heading_table)
             story.append(Spacer(1, 0.2*cm))
             
+        elif line.startswith('#### '):
+            # Recipe title (4 hashes)
+            recipe_title = line[5:].strip()
+            story.append(Spacer(1, 0.2*cm))
+            story.append(Paragraph(recipe_title, styles['RecipeTitle']))
+            
         elif line.startswith('### '):
+            # Section heading
             story.append(Paragraph(line[4:], styles['CustomHeading3']))
             
-        elif line.startswith('- ') or line.startswith('* '):
-            # Bullet with color dot
-            bullet_text = line[2:].strip()
-            story.append(Paragraph(f"▸ {bullet_text}", styles['CustomBullet']))
+        elif line.startswith('**Zutaten:**'):
+            # Ingredients header
+            story.append(Spacer(1, 0.1*cm))
+            story.append(Paragraph("🧂 <b>Zutaten:</b>", styles['CustomHeading3']))
+            story.append(Spacer(1, 0.05*cm))
+            
+        elif line.startswith('**Anleitung:**'):
+            # Instructions header
+            story.append(Spacer(1, 0.15*cm))
+            story.append(Paragraph("👨‍🍳 <b>Anleitung:</b>", styles['CustomHeading3']))
+            story.append(Spacer(1, 0.05*cm))
+            
+        elif line.startswith('- [ ] ') or line.startswith('- '):
+            # Ingredient bullet with checkbox style
+            ingredient = line.replace('- [ ] ', '').replace('- ', '').strip()
+            if ingredient:
+                story.append(Paragraph(f"☐ {ingredient}", styles['RecipeIngredient']))
+            
+        elif line and line[0].isdigit() and '. ' in line:
+            # Numbered instruction
+            story.append(Paragraph(line, styles['RecipeInstruction']))
             
         elif line.startswith('| '):
             # Skip table markers
             pass
+            
+        elif line.startswith('👥 ') or line.startswith('⏱️ '):
+            # Metadata line (servings, time)
+            story.append(Paragraph(line, styles['RecipeMetadata']))
             
         elif line.strip() and not line.startswith('|'):
             story.append(Paragraph(line, styles['CustomBody']))

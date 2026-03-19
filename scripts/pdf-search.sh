@@ -76,19 +76,21 @@ while IFS= read -r pdf_name; do
     # Look for keywords: Rezept, Zutaten, Anleitung, Zubereitung
     if echo "$PDF_TEXT" | grep -iE "(rezept|zutaten|anleitung|zubereitung)" > /dev/null; then
         
-        # Extract sections with recipes
-        RECIPE_SECTIONS=$(echo "$PDF_TEXT" | \
-            grep -iA 20 -E "^(rezept|## |### |---)" | \
-            head -150)
+        # Save PDF text to temp file for smart extraction
+        TEMP_PDF_TEXT=$(mktemp)
+        echo "$PDF_TEXT" > "$TEMP_PDF_TEXT"
         
-        if [[ -n "$RECIPE_SECTIONS" ]]; then
+        # Use smart extraction script
+        EXTRACTED_RECIPES=$(python3 "$SCRIPT_DIR/scripts/extract-recipes-smart.py" "$TEMP_PDF_TEXT" 2>/dev/null || echo "")
+        
+        rm -f "$TEMP_PDF_TEXT"
+        
+        if [[ -n "$EXTRACTED_RECIPES" ]]; then
             RECIPE_TOTAL=$((RECIPE_TOTAL + 1))
             
             RECIPES_SECTION+="## 📖 $PDF_COUNT. $PDF_NAME
 
-\`\`\`
-$RECIPE_SECTIONS
-\`\`\`
+$EXTRACTED_RECIPES
 
 ---
 
@@ -96,7 +98,7 @@ $RECIPE_SECTIONS
         fi
     fi
     
-    [[ $PDF_COUNT -ge 5 ]] && break
+    [[ $PDF_COUNT -ge 10 ]] && break
     
 done <<< "$SOURCES"
 

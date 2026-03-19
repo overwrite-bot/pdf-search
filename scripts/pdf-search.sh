@@ -80,8 +80,8 @@ while IFS= read -r pdf_name; do
         TEMP_PDF_TEXT=$(mktemp)
         echo "$PDF_TEXT" > "$TEMP_PDF_TEXT"
         
-        # Use smart extraction script
-        EXTRACTED_RECIPES=$(python3 "$SCRIPT_DIR/scripts/extract-recipes-smart.py" "$TEMP_PDF_TEXT" 2>/dev/null || echo "")
+        # Use smart extraction script (v3 - only real recipes!)
+        EXTRACTED_RECIPES=$(python3 "$SCRIPT_DIR/scripts/extract-recipes-v3.py" "$TEMP_PDF_TEXT" 2>/dev/null || echo "")
         
         rm -f "$TEMP_PDF_TEXT"
         
@@ -95,6 +95,20 @@ $EXTRACTED_RECIPES
 ---
 
 "
+        else
+            # Fallback: Show raw content if extraction found nothing
+            RAW=$(echo "$PDF_TEXT" | grep -iA 3 -B 1 -E "(rezept|zutaten|anleitung)" | head -100)
+            if [[ -n "$RAW" ]]; then
+                RECIPES_SECTION+="## 📖 $PDF_COUNT. $PDF_NAME (Inhalte)
+
+\`\`\`
+$RAW
+\`\`\`
+
+---
+
+"
+            fi
         fi
     fi
     

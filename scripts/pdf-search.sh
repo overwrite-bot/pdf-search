@@ -123,38 +123,13 @@ $RECIPES_SECTION
 echo "$RAW_MARKDOWN_REPORT" > "${REPORT_FILE}-raw.md"
 echo "✅ Raw Markdown erstellt: ${REPORT_FILE}-raw.md"
 
-# ===== STEP 4: Structure with Claude Code =====
-echo "🤖 Claude Code strukturiert Rezepte..."
-TEMP_REPORT=$(mktemp)
-
-PROMPT="Strukturiere diesen Rezept-Report professionell:
-
-1. Identifiziere echte Rezepte (Titel, Zutaten, Anleitung)
-2. Formatiere:
-   - Rezept-Titel (## Rezept: Name)
-   - Portionen/Zeit falls vorhanden
-   - **Zutaten:** mit Checkboxen (- [ ])
-   - **Anleitung:** nummeriert
-3. Gruppiere nach Gericht-Typ
-4. Füge Quelle (PDF-Name) hinzu
-5. Professionelle Struktur mit Überschrift, Zusammenfassung, Footer
-
-Eingabe:
----
-$(cat "${REPORT_FILE}-raw.md")
----
-
-Ausgabe: Schönes, strukturiertes Markdown für PDF."
-
-echo "$PROMPT" > "$TEMP_REPORT"
-
-claude --permission-mode bypassPermissions --print "$(cat "$TEMP_REPORT")" > "${REPORT_FILE}.md" 2>/dev/null || {
-    echo "⚠️  Claude Code failed, using raw markdown"
+# ===== STEP 4: Structure recipes with smart extraction =====
+echo "🧠 Strukturiere Rezepte..."
+python3 "$SCRIPT_DIR/scripts/extract-recipes-v3.py" "${REPORT_FILE}-raw.md" > "${REPORT_FILE}.md" 2>/dev/null || {
+    echo "⚠️  Extraction failed, using raw markdown"
     cp "${REPORT_FILE}-raw.md" "${REPORT_FILE}.md"
 }
-
-rm -f "$TEMP_REPORT"
-echo "✅ Strukturiert mit Claude Code: ${REPORT_FILE}.md"
+echo "✅ Strukturiert: ${REPORT_FILE}.md"
 
 # ===== STEP 5: Convert to PDF =====
 python3 "$SCRIPT_DIR/scripts/pdf-design.py" "${REPORT_FILE}.md" "${REPORT_FILE}.pdf" 2>/dev/null || {

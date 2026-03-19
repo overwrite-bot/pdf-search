@@ -8,6 +8,7 @@ Supports 3 content types: Recipe, Technical, Narrative.
 
 import json
 import sys
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
@@ -38,7 +39,8 @@ def format_recipe_html(item, index):
             html += f'<li>{step}</li>'
         html += '</ol></div>'
     
-    source_link = f'<a href="file://{pdf_path}">{pdf_name}</a>' if pdf_path else pdf_name
+    # Fix H6: URL-encode file:// links (handle spaces in paths)
+    source_link = f'<a href="file://{urllib.parse.quote(pdf_path)}">{pdf_name}</a>' if pdf_path else pdf_name
     html += f"""
         </div>
         <p class="source">📄 Quelle: {source_link}</p>
@@ -74,7 +76,8 @@ def format_technical_html(item, index):
             html += f'<li>{point}</li>'
         html += '</ul></div>'
     
-    source_link = f'<a href="file://{pdf_path}">{pdf_name}</a>' if pdf_path else pdf_name
+    # Fix H6: URL-encode file:// links (handle spaces in paths)
+    source_link = f'<a href="file://{urllib.parse.quote(pdf_path)}">{pdf_name}</a>' if pdf_path else pdf_name
     html += f"""
         </div>
         <p class="source">📄 Quelle: {source_link}</p>
@@ -114,7 +117,8 @@ def format_narrative_html(item, index):
             html += f'<li>{concept}</li>'
         html += '</ul></div>'
     
-    source_link = f'<a href="file://{pdf_path}">{pdf_name}</a>' if pdf_path else pdf_name
+    # Fix H6: URL-encode file:// links (handle spaces in paths)
+    source_link = f'<a href="file://{urllib.parse.quote(pdf_path)}">{pdf_name}</a>' if pdf_path else pdf_name
     html += f"""
         </div>
         <p class="source">📄 Quelle: {source_link}</p>
@@ -146,9 +150,10 @@ def format_recipe_md(item, index):
             md += f"{i}. {step}\n"
         md += "\n"
     
-    # Source with optional link
+    # Source with optional link (Fix H6: URL-encode for spaces)
     if pdf_path:
-        source_text = f"[{pdf_name}]({pdf_path})"
+        encoded_path = f"file://{urllib.parse.quote(pdf_path)}"
+        source_text = f"[{pdf_name}]({encoded_path})"
     else:
         source_text = pdf_name
     
@@ -178,9 +183,10 @@ def format_technical_md(item, index):
             md += f"- {point}\n"
         md += "\n"
     
-    # Source with optional link
+    # Source with optional link (Fix H6: URL-encode for spaces)
     if pdf_path:
-        source_text = f"[{pdf_name}]({pdf_path})"
+        encoded_path = f"file://{urllib.parse.quote(pdf_path)}"
+        source_text = f"[{pdf_name}]({encoded_path})"
     else:
         source_text = pdf_name
     
@@ -214,9 +220,10 @@ def format_narrative_md(item, index):
             md += f"- {concept}\n"
         md += "\n"
     
-    # Source with optional link
+    # Source with optional link (Fix H6: URL-encode for spaces)
     if pdf_path:
-        source_text = f"[{pdf_name}]({pdf_path})"
+        encoded_path = f"file://{urllib.parse.quote(pdf_path)}"
+        source_text = f"[{pdf_name}]({encoded_path})"
     else:
         source_text = pdf_name
     

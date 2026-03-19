@@ -73,11 +73,12 @@ while IFS= read -r pdf_name; do
     PDF_NAME=$(basename "$pdf")
     echo "  [$PDF_COUNT] Analyzing: $PDF_NAME..."
     
-    # Extract PDF text (5000 chars = better coverage of actual content, skip metadata)
+    # Extract PDF text (7000 chars = even better coverage, skip first 2000 chars metadata)
     # Use iconv to fix encoding issues
+    # H1 Experiment: Longer extraction window
     PDF_TEXT=$(pdftotext "$pdf" - 2>/dev/null | \
         iconv -f UTF-8 -t UTF-8 -c | \
-        head -c 5000 || echo "")
+        head -c 7000 || echo "")
     
     [[ -z "$PDF_TEXT" ]] && {
         echo "      ⚠️  Could not extract text"

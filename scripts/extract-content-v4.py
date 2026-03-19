@@ -205,10 +205,11 @@ def extract_from_pdf_text(pdf_text, pdf_name, pdf_path=None):
     Extract content from raw PDF text.
     Returns: {pdf_name, pdf_path, content_type, raw_content}
     """
-    # Skip metadata/TOC (first 1000 chars often contain copyright/metadata)
-    # Then take next 3000 chars (content more likely)
-    # Total: up to 4000 chars per PDF (better content coverage)
-    text = pdf_text[1000:5000] if len(pdf_text) > 1000 else pdf_text
+    # Skip more metadata/TOC (first 2000 chars more aggressive)
+    # Then take next 5000 chars (more content, less metadata)
+    # Total: up to 5000 chars per PDF (even better content coverage)
+    # H1 Experiment: Longer extraction window for better relevance
+    text = pdf_text[2000:7000] if len(pdf_text) > 2000 else pdf_text
     
     content_type = identify_content_type(text)
     

@@ -147,6 +147,41 @@ function getTocSummary(pdfId) {
 }
 
 /**
+ * Universal Meta-Search über alle Quellen
+ * @param {string} query - Suchtext
+ * @returns {object} - Ergebnisse von PDFs, KB, Memory, Wikipedia
+ */
+function universalSearch(query) {
+  if (!query) {
+    return { error: "Suchtext erforderlich" };
+  }
+
+  const cacheKey = `universal:${query}`;
+  return getCachedSearch(cacheKey, () => {
+    return executeUniversalTool(query);
+  });
+}
+
+/**
+ * Führt das Universal-Search-Tool aus
+ */
+function executeUniversalTool(query) {
+  try {
+    const escapedQuery = query ? `"${query.replace(/"/g, '\\"')}"` : "";
+    const result = execSync(
+      `python3 "/home/overwrite/.openclaw/tools/universal-search.py" ${escapedQuery}`,
+      { encoding: "utf-8", maxBuffer: 50 * 1024 * 1024, timeout: 10000 }
+    );
+    return JSON.parse(result);
+  } catch (error) {
+    return {
+      error: `Universal-Search Fehler: ${error.message}`,
+      code: error.code,
+    };
+  }
+}
+
+/**
  * Formatiert Suchergebnisse für OpenClaw (bessere Markdown-Formatierung)
  */
 function formatSearchResults(results) {
@@ -261,6 +296,15 @@ const tools = {
       });
       return output;
     }
+  },
+  "pdf-search:universal": {
+    label: "Universelle Metasuche",
+    description: "Durchsucht ALLES: PDFs, Wikipedia, Knowledge Base, Memory",
+    handler: (query) => {
+      const results = universalSearch(query);
+      if (results.error) return `❌ ${results.error}`;
+      return results.formatted || "Keine Ergebnisse";
+    }
   }
 };
 
@@ -271,6 +315,7 @@ module.exports = {
   getPdfContent,
   searchWithToc,
   getTocSummary,
+  universalSearch,
   formatSearchResults,
   formatQuotes,
   tools
@@ -282,7 +327,15 @@ if (require.main === module) {
   const command = args[0];
   const query = args.slice(1).join(" ");
 
-  if (command === "search") {
+  if (command === "universal") {
+    const results = universalSearch(query);
+    if (results.error) {
+      console.error("Fehler:", results.error);
+    } else {
+      console.log(results.formatted || "Keine Ergebnisse");
+      console.log(`\n📊 Quellen: PDFs: ${results.sources?.pdfs || 0} | KB: ${results.sources?.kb || 0} | Memory: ${results.sources?.memory || 0} | Wikipedia: ${results.sources?.wikipedia || 0}`);
+    }
+  } else if (command === "search") {
     const results = searchPdfs(query);
     if (!results) {
       console.error("Fehler: Keine Ergebnisse");
@@ -338,12 +391,14 @@ if (require.main === module) {
       console.log(`📖 ${content.filename}\n\n${content.content}`);
     }
   } else {
-    console.log("PDF-Search Skill");
+    console.log("🔍 PDF-Search Skill v2.1 - Universal Meta-Search");
+    console.log("==================================================");
     console.log("Verwendung:");
-    console.log("  node index.js search <query>      - Sucht nach PDFs");
-    console.log("  node index.js search-toc <query>  - Sucht mit TOC-Priorität");
-    console.log("  node index.js quote <text>        - Sucht nach Zitaten");
-    console.log("  node index.js toc <id>            - Zeigt Inhaltsverzeichnis");
-    console.log("  node index.js content <id>        - Holt PDF-Inhalt");
+    console.log("  node index.js search <query>        - Sucht nach PDFs");
+    console.log("  node index.js search-toc <query>    - Sucht mit TOC-Priorität");
+    console.log("  node index.js universal <query>     - 🌟 ALLES durchsuchen (PDFs+KB+Memory+Wiki)");
+    console.log("  node index.js quote <text>          - Sucht nach Zitaten");
+    console.log("  node index.js toc <id>              - Zeigt Inhaltsverzeichnis");
+    console.log("  node index.js content <id>          - Holt PDF-Inhalt");
   }
 }

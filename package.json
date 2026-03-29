@@ -1,6 +1,6 @@
 {
   "name": "pdf-search-skill",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "OpenClaw Skill: Intelligente PDF-Suche mit TOC-Optimierung für 8.482+ PDFs",
   "main": "index.js",
   "keywords": [

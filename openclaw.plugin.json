@@ -16,6 +16,12 @@
   "manifest": {
     "tools": [
       {
+        "id": "universal-search-tool",
+        "name": "🌟 Universelle Metasuche",
+        "description": "Durchsucht ALLES: PDFs (8.482), Knowledge Base, Memory & Wikipedia offline!",
+        "execute": "universalSearch"
+      },
+      {
         "id": "pdf-search-tool",
         "name": "PDF durchsuchen",
         "description": "Sucht in der PDF-Sammlung nach Büchern/Themen",

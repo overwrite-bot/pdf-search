@@ -1,0 +1,12 @@
+{
+  "name": "pdf-search-skill",
+  "version": "1.0.0",
+  "description": "PDF-Suchtool für OpenClaw",
+  "main": "index.js",
+  "keywords": ["pdf", "search", "skill"],
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "test": "node test.js"
+  }
+}

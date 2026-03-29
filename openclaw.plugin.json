@@ -1,0 +1,50 @@
+{
+  "id": "pdf-search-skill",
+  "name": "pdf-search-skill",
+  "displayName": "PDF Search",
+  "description": "Durchsucht deine PDF-Sammlung nach Büchern und Zitaten",
+  "version": "1.0.0",
+  "type": "skill",
+  "main": "index.js",
+  "engines": {
+    "openclaw": "*"
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "manifest": {
+    "tools": [
+      {
+        "id": "pdf-search-tool",
+        "name": "PDF durchsuchen",
+        "description": "Sucht in der PDF-Sammlung nach Büchern/Themen",
+        "execute": "searchPdfs"
+      },
+      {
+        "id": "pdf-search-toc-tool",
+        "name": "Intelligente PDF-Suche (TOC-optimiert)",
+        "description": "Sucht mit Priorität auf Inhaltsverzeichnis für bessere Relevanz",
+        "execute": "searchWithToc"
+      },
+      {
+        "id": "pdf-quote-tool",
+        "name": "Zitat suchen",
+        "description": "Sucht nach genauen Zitaten in deinen PDFs",
+        "execute": "findQuote"
+      },
+      {
+        "id": "pdf-toc-tool",
+        "name": "Inhaltsverzeichnis anzeigen",
+        "description": "Zeigt Kapitel und Struktur eines PDFs",
+        "execute": "getTocSummary"
+      },
+      {
+        "id": "pdf-content-tool",
+        "name": "PDF-Inhalt abrufen",
+        "description": "Holt den kompletten Inhalt eines PDFs",
+        "execute": "getPdfContent"
+      }
+    ]
+  }
+}

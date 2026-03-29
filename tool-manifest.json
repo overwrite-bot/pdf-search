@@ -1,0 +1,38 @@
+{
+  "id": "pdf-search",
+  "name": "PDF Search",
+  "description": "Durchsucht deine PDF-Sammlung nach Büchern und Zitaten",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "name": "search",
+      "description": "Sucht nach Büchern/Themen in der PDF-Sammlung",
+      "parameters": {
+        "query": {
+          "type": "string",
+          "description": "Suchtext (z.B. 'Python', 'Machine Learning', 'Quantenmechanik')"
+        }
+      }
+    },
+    {
+      "name": "quote",
+      "description": "Sucht nach genauen Zitaten und Textpassagen in PDFs",
+      "parameters": {
+        "text": {
+          "type": "string",
+          "description": "Text oder Zitat zum Suchen"
+        }
+      }
+    },
+    {
+      "name": "content",
+      "description": "Holt den Inhalt eines spezifischen PDFs",
+      "parameters": {
+        "pdf_id": {
+          "type": "number",
+          "description": "Die ID des PDFs (aus Suchergebnissen)"
+        }
+      }
+    }
+  ]
+}

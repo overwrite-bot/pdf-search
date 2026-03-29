@@ -1,12 +1,32 @@
 {
   "name": "pdf-search-skill",
-  "version": "1.0.0",
-  "description": "PDF-Suchtool für OpenClaw",
+  "version": "2.0.0",
+  "description": "OpenClaw Skill: Intelligente PDF-Suche mit TOC-Optimierung für 8.482+ PDFs",
   "main": "index.js",
-  "keywords": ["pdf", "search", "skill"],
-  "author": "",
+  "keywords": [
+    "pdf",
+    "search",
+    "skill",
+    "openclaw",
+    "toc",
+    "table-of-contents",
+    "fts5",
+    "full-text-search"
+  ],
+  "author": "OpenClaw Community",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/overwrite-bot/pdf-search.git"
+  },
   "scripts": {
-    "test": "node test.js"
-  }
+    "test": "node index.js search test && node index.js search-toc test && echo 'Tests passed!'",
+    "dev": "node index.js search \"test\""
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {},
+  "optionalDependencies": {},
+  "devDependencies": {}
 }
